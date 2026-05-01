@@ -40,14 +40,15 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function HeroSection() {
-  const [search, setSearch]         = useState("");
+  const [search, setSearch]           = useState("");
   const [activeGenre, setActiveGenre] = useState("Todos");
-  const [results, setResults]       = useState([]);
-  const [searching, setSearching]   = useState(false);
-  const [dropOpen, setDropOpen]     = useState(false);
-  const [menuOpen, setMenuOpen]     = useState(false);
-  const searchRef                   = useRef(null);
-  const debouncedSearch             = useDebounce(search, 400);
+  const [results, setResults]         = useState<any[]>([]);
+  const [searching, setSearching]     = useState(false);
+  const [dropOpen, setDropOpen]       = useState(false);
+  const [menuOpen, setMenuOpen]       = useState(false);
+  // ✅ FIX: typed ref so TypeScript knows .contains() exists
+  const searchRef                     = useRef<HTMLDivElement>(null);
+  const debouncedSearch               = useDebounce(search, 400);
 
   useEffect(() => {
     const query = debouncedSearch.trim();
@@ -70,22 +71,22 @@ export default function HeroSection() {
   }, [debouncedSearch]);
 
   useEffect(() => {
-  function h(e: MouseEvent) {
-    if (
-      searchRef.current &&
-      e.target instanceof Node &&
-      !searchRef.current.contains(e.target)
-    ) {
-      setDropOpen(false);
+    function h(e: MouseEvent) {
+      if (
+        searchRef.current &&
+        e.target instanceof Node &&
+        !searchRef.current.contains(e.target)
+      ) {
+        setDropOpen(false);
+      }
     }
-  }
 
-  document.addEventListener("mousedown", h);
+    document.addEventListener("mousedown", h);
 
-  return () => {
-    document.removeEventListener("mousedown", h);
-  };
-}, []);
+    return () => {
+      document.removeEventListener("mousedown", h);
+    };
+  }, []);
 
   return (
     <>
@@ -423,13 +424,13 @@ export default function HeroSection() {
                   ) : (
                     <>
                       <div className="hs-drop-list">
-                        {results.map(anime => {
+                        {results.map((anime: any) => {
                           const img   = anime.images?.webp?.image_url ?? anime.images?.jpg?.image_url ?? "";
                           const score = anime.score ? `★ ${anime.score.toFixed(1)}` : null;
                           const genre = anime.genres?.[0]?.name ?? null;
                           return (
                             <div key={anime.mal_id} className="hs-drop-item">
-                              <img src={img} alt={anime.title} className="hs-drop-img" onError={e=>{ e.currentTarget.style.opacity="0"; }}/>
+                              <img src={img} alt={anime.title} className="hs-drop-img" onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.opacity="0"; }}/>
                               <div style={{ flex:1,minWidth:0 }}>
                                 <div style={{ fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.88)",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{anime.title}</div>
                                 {anime.title_japanese && <div style={{ fontSize:10,color:"rgba(255,255,255,0.28)",letterSpacing:2,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{anime.title_japanese}</div>}
