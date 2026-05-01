@@ -70,15 +70,22 @@ export default function HeroSection() {
   }, [debouncedSearch]);
 
   useEffect(() => {
-    function h(e: MouseEvent) {
-  if (
-    searchRef.current &&
-    !searchRef.current.contains(e.target as Node)
-  ) {
-    setDropOpen(false);
+  function h(e: MouseEvent) {
+    if (
+      searchRef.current &&
+      e.target instanceof Node &&
+      !searchRef.current.contains(e.target)
+    ) {
+      setDropOpen(false);
+    }
   }
-}
-  }, []);
+
+  document.addEventListener("mousedown", h);
+
+  return () => {
+    document.removeEventListener("mousedown", h);
+  };
+}, []);
 
   return (
     <>
