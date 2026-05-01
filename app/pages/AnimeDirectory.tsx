@@ -1,4 +1,4 @@
-// AnimeDirectory.jsx
+// AnimeDirectory.tsx
 // Requiere Google Fonts en tu layout:
 // <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Bangers&family=Dela+Gothic+One&display=swap" rel="stylesheet">
 
@@ -7,15 +7,49 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Generos se cargan dinamicamente desde Jikan (incluye explicit genres: Hentai, Yaoi, Yuri, etc.)
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface GenreOption {
+  id: number;
+  name: string;
+}
 
-const STATUS_OPTIONS = [
-  { val: "airing",   label: "En emision",    jp: "放送中" },
-  { val: "complete", label: "Finalizado",     jp: "完了"   },
-  { val: "upcoming", label: "Proximamente",   jp: "予定"   },
+interface SelectOption {
+  val: string;
+  label: string;
+  jp?: string;
+  id?: string | number;
+  name?: string;
+}
+
+interface ActivePill {
+  key: string;
+  val: string | number;
+  label: string;
+}
+
+interface Anime {
+  mal_id: number;
+  title: string;
+  title_japanese?: string;
+  type?: string;
+  status?: string;
+  score?: number;
+  episodes?: number;
+  genres?: { mal_id: number; name: string }[];
+  images?: {
+    webp?: { large_image_url?: string; image_url?: string };
+    jpg?:  { large_image_url?: string; image_url?: string };
+  };
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const STATUS_OPTIONS: SelectOption[] = [
+  { val: "airing",   label: "En emision",  jp: "放送中" },
+  { val: "complete", label: "Finalizado",   jp: "完了"   },
+  { val: "upcoming", label: "Proximamente", jp: "予定"   },
 ];
 
-const TYPE_OPTIONS = [
+const TYPE_OPTIONS: SelectOption[] = [
   { val: "tv",      label: "Serie (TV)", jp: "TVシリーズ" },
   { val: "movie",   label: "Pelicula",   jp: "映画"       },
   { val: "ova",     label: "OVA",        jp: "OVA"        },
@@ -23,7 +57,7 @@ const TYPE_OPTIONS = [
   { val: "special", label: "Especial",   jp: "スペシャル" },
 ];
 
-const ORDER_OPTIONS = [
+const ORDER_OPTIONS: SelectOption[] = [
   { val: "score",      label: "Mayor puntuacion" },
   { val: "popularity", label: "Mas populares"    },
   { val: "members",    label: "Mas miembros"     },
@@ -32,16 +66,17 @@ const ORDER_OPTIONS = [
   { val: "title",      label: "Titulo A-Z"       },
 ];
 
-function statusToJikan(val) {
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function statusToJikan(val: string): string {
   if (val === "airing")   return "Currently Airing";
   if (val === "complete") return "Finished Airing";
   if (val === "upcoming") return "Not yet aired";
   return val;
 }
 
-function getPageNums(cur, total) {
+function getPageNums(cur: number, total: number): (number | string)[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const p = [1];
+  const p: (number | string)[] = [1];
   if (cur > 3) p.push("...");
   for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) p.push(i);
   if (cur < total - 2) p.push("...");
@@ -49,16 +84,30 @@ function getPageNums(cur, total) {
   return p;
 }
 
-// ── Searchable multi-select ────────────────────────────────────────────────────
-function MultiSelect({ label, labelJp, placeholder, options, selected, onToggle, single = false, loading = false }) {
+// ── MultiSelect ────────────────────────────────────────────────────────────────
+interface MultiSelectProps {
+  label: string;
+  labelJp?: string;
+  placeholder: string;
+  options: SelectOption[];
+  selected: (string | number)[];
+  onToggle: (key: string | number) => void;
+  single?: boolean;
+  loading?: boolean;
+}
+
+function MultiSelect({
+  label, labelJp, placeholder, options, selected,
+  onToggle, single = false, loading = false,
+}: MultiSelectProps) {
   const [open,  setOpen]  = useState(false);
   const [query, setQuery] = useState("");
-  const inputRef          = useRef(null);
-  const wrapRef           = useRef(null);
+  const inputRef          = useRef<HTMLInputElement>(null);
+  const wrapRef           = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handler(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+    function handler(e: MouseEvent) {
+      if (wrapRef.current && e.target instanceof Node && !wrapRef.current.contains(e.target)) {
         setOpen(false);
         setQuery("");
       }
@@ -169,7 +218,7 @@ function MultiSelect({ label, labelJp, placeholder, options, selected, onToggle,
                   const isSelected = selected.includes(key);
                   return (
                     <div
-                      key={key}
+                      key={String(key)}
                       onClick={() => { onToggle(key); if (single) { setOpen(false); setQuery(""); } }}
                       style={{
                         display: "flex", alignItems: "center", gap: 8,
@@ -208,51 +257,45 @@ function MultiSelect({ label, labelJp, placeholder, options, selected, onToggle,
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function AnimeDirectory() {
-  // Generos cargados desde la API
-  const [genreOptions,  setGenreOptions]  = useState([]);
+  const [genreOptions,  setGenreOptions]  = useState<GenreOption[]>([]);
   const [genresLoading, setGenresLoading] = useState(true);
 
-  // Filtros
-  const [selGenres, setSelGenres] = useState([]);
-  const [selStatus, setSelStatus] = useState([]);
-  const [selTypes,  setSelTypes]  = useState([]);
+  const [selGenres, setSelGenres] = useState<number[]>([]);
+  const [selStatus, setSelStatus] = useState<string[]>([]);
+  const [selTypes,  setSelTypes]  = useState<string[]>([]);
   const [order,     setOrder]     = useState("score");
 
-  // Data
-  const [animes,   setAnimes]   = useState([]);
+  const [animes,   setAnimes]   = useState<Anime[]>([]);
   const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState(null);
+  const [error,    setError]    = useState<string | null>(null);
   const [page,     setPage]     = useState(1);
   const [lastPage, setLastPage] = useState(1);
-  const [total,    setTotal]    = useState(null);
+  const [total,    setTotal]    = useState<number | null>(null);
 
-  const sectionRef = useRef(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
-  // ── Cargar TODOS los generos desde Jikan (un solo endpoint) ─────────────────
+  // ── Cargar géneros ───────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
         const res  = await fetch("https://api.jikan.moe/v4/genres/anime");
         if (!res.ok) throw new Error();
         const json = await res.json();
-
-        const genres = (json.data ?? [])
-          .map(g => ({ id: g.mal_id, name: g.name }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-
+        const genres: GenreOption[] = (json.data ?? [])
+          .map((g: { mal_id: number; name: string }) => ({ id: g.mal_id, name: g.name }))
+          .sort((a: GenreOption, b: GenreOption) => a.name.localeCompare(b.name));
         setGenreOptions(genres);
       } catch {
-        // Fallback a lista basica si falla
         setGenreOptions([
-          { id: 1,  name: "Action"       }, { id: 2,  name: "Adventure"    },
-          { id: 4,  name: "Comedy"       }, { id: 8,  name: "Drama"        },
-          { id: 10, name: "Fantasy"      }, { id: 14, name: "Horror"       },
-          { id: 22, name: "Romance"      }, { id: 24, name: "Sci-Fi"       },
-          { id: 36, name: "Slice of Life"}, { id: 37, name: "Supernatural" },
-          { id: 62, name: "Isekai"       }, { id: 27, name: "Shounen"      },
-          { id: 25, name: "Shoujo"       }, { id: 42, name: "Seinen"       },
-          { id: 49, name: "Hentai"       }, { id: 26, name: "Yaoi"         },
-          { id: 74, name: "Yuri"         },
+          { id: 1,  name: "Action"        }, { id: 2,  name: "Adventure"    },
+          { id: 4,  name: "Comedy"        }, { id: 8,  name: "Drama"        },
+          { id: 10, name: "Fantasy"       }, { id: 14, name: "Horror"       },
+          { id: 22, name: "Romance"       }, { id: 24, name: "Sci-Fi"       },
+          { id: 36, name: "Slice of Life" }, { id: 37, name: "Supernatural" },
+          { id: 62, name: "Isekai"        }, { id: 27, name: "Shounen"      },
+          { id: 25, name: "Shoujo"        }, { id: 42, name: "Seinen"       },
+          { id: 49, name: "Hentai"        }, { id: 26, name: "Yaoi"         },
+          { id: 74, name: "Yuri"          },
         ]);
       } finally {
         setGenresLoading(false);
@@ -261,28 +304,27 @@ export default function AnimeDirectory() {
   }, []);
 
   // ── Fetch animes ─────────────────────────────────────────────────────────────
-  const fetchAnimes = useCallback(async (pg) => {
+  const fetchAnimes = useCallback(async (pg: number) => {
     setLoading(true); setError(null);
     try {
       const params = new URLSearchParams();
       params.set("limit",    "24");
-      params.set("page",     pg);
+      params.set("page",     String(pg));
       params.set("order_by", order);
       params.set("sort",     order === "title" ? "asc" : "desc");
 
-      if (selStatus.length === 1) params.set("status", selStatus[0]);
+      if (selStatus.length === 1) params.set("status", statusToJikan(selStatus[0]));
       if (selTypes.length  === 1) params.set("type",   selTypes[0]);
       if (selGenres.length >= 1)  params.set("genres", selGenres.join(","));
 
       const res  = await fetch(`https://api.jikan.moe/v4/anime?${params}`);
       if (!res.ok) throw new Error();
       const json = await res.json();
-      let data   = json.data ?? [];
+      let data: Anime[] = json.data ?? [];
 
-      // Client-side multi-filter para status y type cuando son varios
       if (selStatus.length > 1) {
         const set = new Set(selStatus.map(statusToJikan));
-        data = data.filter(a => set.has(a.status));
+        data = data.filter(a => set.has(a.status ?? ""));
       }
       if (selTypes.length > 1) {
         const set = new Set(selTypes.map(v => v.toUpperCase()));
@@ -302,22 +344,22 @@ export default function AnimeDirectory() {
 
   useEffect(() => { fetchAnimes(1); }, [selGenres, selStatus, selTypes, order]);
 
-  function goTo(p) {
+  function goTo(p: number) {
     fetchAnimes(p);
     sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function toggleItem(setter, key) {
+  function toggleItem<T>(setter: React.Dispatch<React.SetStateAction<T[]>>, key: T) {
     setter(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   }
 
-  const activePills = [
-    ...selGenres.map(id => ({ key: "genre",  val: id, label: genreOptions.find(g => g.id === id)?.name ?? id })),
+  const activePills: ActivePill[] = [
+    ...selGenres.map(id => ({ key: "genre",  val: id, label: genreOptions.find(g => g.id === id)?.name ?? String(id) })),
     ...selStatus.map(v  => ({ key: "status", val: v,  label: STATUS_OPTIONS.find(s => s.val === v)?.label ?? v })),
     ...selTypes.map(v   => ({ key: "type",   val: v,  label: TYPE_OPTIONS.find(t => t.val === v)?.label ?? v })),
   ];
 
-  function removeFilter(key, val) {
+  function removeFilter(key: string, val: string | number) {
     if (key === "genre")  setSelGenres(p => p.filter(k => k !== val));
     if (key === "status") setSelStatus(p => p.filter(k => k !== val));
     if (key === "type")   setSelTypes(p  => p.filter(k => k !== val));
@@ -372,17 +414,13 @@ export default function AnimeDirectory() {
         {/* Header */}
         <div style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-
-            {/* Boton volver */}
             <Link href="/" className="dir-back-btn">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <polyline points="9,2 4,7 9,12" />
               </svg>
               VOLVER
             </Link>
-
             <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.07)", flexShrink: 0 }} />
-
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <div style={{ width: 4, height: 42, background: "#dc1e3c", borderRadius: 2, flexShrink: 0 }} />
               <div>
@@ -391,7 +429,6 @@ export default function AnimeDirectory() {
               </div>
             </div>
           </div>
-
           {total !== null && (
             <div style={{ fontFamily: "'Bangers',cursive", fontSize: 13, letterSpacing: 3, color: "rgba(255,255,255,0.25)" }}>
               {animes.length} de {total.toLocaleString()} resultados
@@ -405,9 +442,9 @@ export default function AnimeDirectory() {
             <MultiSelect
               label="GENERO" labelJp="ジャンル"
               placeholder="Todos los generos"
-              options={genreOptions}
+              options={genreOptions.map(g => ({ val: String(g.id), id: g.id, name: g.name, label: g.name }))}
               selected={selGenres}
-              onToggle={key => toggleItem(setSelGenres, key)}
+              onToggle={key => toggleItem(setSelGenres, Number(key))}
               loading={genresLoading}
             />
             <MultiSelect
@@ -415,21 +452,21 @@ export default function AnimeDirectory() {
               placeholder="Todos los estados"
               options={STATUS_OPTIONS}
               selected={selStatus}
-              onToggle={key => toggleItem(setSelStatus, key)}
+              onToggle={key => toggleItem(setSelStatus, String(key))}
             />
             <MultiSelect
               label="TIPO" labelJp="タイプ"
               placeholder="Todos los tipos"
               options={TYPE_OPTIONS}
               selected={selTypes}
-              onToggle={key => toggleItem(setSelTypes, key)}
+              onToggle={key => toggleItem(setSelTypes, String(key))}
             />
             <MultiSelect
               label="ORDENAR" labelJp="並び替え"
               placeholder="Ordenar por..."
               options={ORDER_OPTIONS.map(o => ({ ...o, id: o.val }))}
               selected={[order]}
-              onToggle={key => setOrder(key)}
+              onToggle={key => setOrder(String(key))}
               single
             />
           </div>
@@ -494,7 +531,7 @@ export default function AnimeDirectory() {
                   <div key={anime.mal_id} className="dir-card" style={{ animationDelay: `${(i * 0.03).toFixed(2)}s` }}>
                     <div style={{ width: "100%", aspectRatio: "3/4", overflow: "hidden", position: "relative", background: "#1a1a2e" }}>
                       <img src={img} alt={anime.title} className="dir-cimg" loading="lazy"
-                        onError={e => { e.currentTarget.style.opacity = "0"; }} />
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }} />
                       <div className="dir-overlay" />
                       <span style={{ position: "absolute", top: 9, left: 9, zIndex: 5, fontFamily: "'Bangers',cursive", fontSize: 10, letterSpacing: 2, background: "#dc1e3c", color: "#fff", padding: "2px 7px", borderRadius: 3 }}>
                         {anime.type || "TV"}
@@ -539,7 +576,7 @@ export default function AnimeDirectory() {
                   n === "..." ? (
                     <span key={`e${i}`} style={{ color: "rgba(255,255,255,.2)", fontFamily: "'Bangers',cursive", fontSize: 13, padding: "0 4px" }}>...</span>
                   ) : (
-                    <button key={n} className={`dir-pg-num${n === page ? " active" : ""}`} onClick={() => goTo(n)}>{n}</button>
+                    <button key={n} className={`dir-pg-num${n === page ? " active" : ""}`} onClick={() => goTo(Number(n))}>{n}</button>
                   )
                 )}
                 <span style={{ fontFamily: "'Noto Sans JP',sans-serif", fontSize: 10, color: "rgba(255,255,255,.2)", letterSpacing: 3, margin: "0 8px", whiteSpace: "nowrap" }}>pag {page}</span>
