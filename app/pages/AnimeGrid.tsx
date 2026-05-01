@@ -1,4 +1,4 @@
-// AnimeGrid.jsx — Animes "Currently Airing" con paginación local desde Jikan API
+// AnimeGrid.tsx — Animes "Currently Airing" con paginación local desde Jikan API
 // Requiere Google Fonts en tu layout:
 // <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Bangers&family=Dela+Gothic+One&display=swap" rel="stylesheet">
 
@@ -7,14 +7,31 @@
 import { useEffect, useRef, useState } from "react";
 
 const PER_PAGE  = 24;
-const MAX_PAGES = 6; // máximo de páginas de API a recorrer (~150 animes)
+const MAX_PAGES = 6;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface Anime {
+  mal_id: number;
+  title: string;
+  type?: string;
+  status?: string;
+  score?: number;
+  episodes?: number;
+  genres?: { mal_id: number; name: string }[];
+  images?: {
+    webp?: { large_image_url?: string };
+    jpg?:  { large_image_url?: string };
+  };
+}
 
-function getPageNumbers(current, total) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function getPageNumbers(current: number, total: number): (number | string)[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const pages = [1];
+  const pages: (number | string)[] = [1];
   if (current > 3) pages.push("...");
   for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
   if (current < total - 2) pages.push("...");
@@ -24,48 +41,46 @@ function getPageNumbers(current, total) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AnimeGrid() {
-  const [all, setAll]         = useState([]);       // todos los animes acumulados
-  const [page, setPage]       = useState(1);        // página UI actual
-  const [loading, setLoading] = useState(true);
-  const [fetching, setFetching] = useState(false);  // cargando páginas en BG
-  const [error, setError]     = useState(null);
-  const sectionRef            = useRef(null);
+  const [all,      setAll]      = useState<Anime[]>([]);
+  const [page,     setPage]     = useState(1);
+  const [loading,  setLoading]  = useState(true);
+  const [fetching, setFetching] = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+  const sectionRef              = useRef<HTMLElement>(null);
 
-  // ── Fetch páginas de Jikan ──────────────────────────────────────────────────
+  // ── Fetch páginas de Jikan ────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        // Página 1: muestra resultados inmediatamente
         const res  = await fetch(
           "https://api.jikan.moe/v4/anime?status=airing&order_by=score&sort=desc&limit=25&page=1"
         );
         if (!res.ok) throw new Error(`API error ${res.status}`);
-        const json      = await res.json();
-        const firstBatch = (json.data ?? []).filter(a => a.status === "Currently Airing");
-        const lastApiPage = json.pagination?.last_visible_page ?? 1;
+        const json       = await res.json();
+        const firstBatch: Anime[] = (json.data ?? []).filter((a: Anime) => a.status === "Currently Airing");
+        const lastApiPage: number = json.pagination?.last_visible_page ?? 1;
 
         if (!cancelled) { setAll(firstBatch); setLoading(false); }
 
-        // Páginas siguientes en segundo plano
         const limit = Math.min(lastApiPage, MAX_PAGES);
         if (limit > 1) {
           if (!cancelled) setFetching(true);
           for (let p = 2; p <= limit; p++) {
-            await sleep(360); // respetar rate limit de Jikan (3 req/s)
+            await sleep(360);
             if (cancelled) break;
-            const r2   = await fetch(
+            const r2  = await fetch(
               `https://api.jikan.moe/v4/anime?status=airing&order_by=score&sort=desc&limit=25&page=${p}`
             );
             if (!r2.ok) break;
-            const j2   = await r2.json();
-            const more = (j2.data ?? []).filter(a => a.status === "Currently Airing");
+            const j2  = await r2.json();
+            const more: Anime[] = (j2.data ?? []).filter((a: Anime) => a.status === "Currently Airing");
             if (!cancelled) setAll(prev => [...prev, ...more]);
           }
           if (!cancelled) setFetching(false);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) { setError("No se pudo conectar con Jikan API"); setLoading(false); }
       }
     })();
@@ -73,18 +88,18 @@ export default function AnimeGrid() {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Derived ──────────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(all.length / PER_PAGE));
   const items      = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
   const pageNums   = getPageNumbers(page, totalPages);
 
-  function goTo(p) {
+  function goTo(p: number) {
     if (p < 1 || p > totalPages) return;
     setPage(p);
     sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -114,7 +129,6 @@ export default function AnimeGrid() {
         .ag-spin{width:40px;height:40px;border-radius:50%;border:3px solid rgba(220,30,60,0.2);border-top-color:#dc1e3c;animation:ag-spin 1s linear infinite;}
         @keyframes ag-spin{to{transform:rotate(360deg);}}
 
-        /* Pagination */
         .ag-pg-btn{width:36px;height:36px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.45);font-family:'Bangers',cursive;font-size:14px;letter-spacing:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
         .ag-pg-btn:hover:not(:disabled){border-color:rgba(220,30,60,0.4);color:#fff;background:rgba(220,30,60,0.1);}
         .ag-pg-btn:disabled{opacity:0.25;cursor:not-allowed;}
@@ -175,7 +189,8 @@ export default function AnimeGrid() {
                 return (
                   <div key={anime.mal_id} className="ag-card" style={{ animationDelay:`${(i * 0.03).toFixed(2)}s` }}>
                     <div style={{ width:"100%", aspectRatio:"3/4", overflow:"hidden", position:"relative", background:"#1a1a2e" }}>
-                      <img src={img} alt={anime.title} className="ag-cimg" loading="lazy" onError={e=>{ e.currentTarget.style.opacity="0"; }}/>
+                      <img src={img} alt={anime.title} className="ag-cimg" loading="lazy"
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }}/>
                       <div className="ag-overlay"/>
                       <span style={{ position:"absolute", top:10, left:10, zIndex:5, fontFamily:"'Bangers',cursive", fontSize:11, letterSpacing:2, background:"#dc1e3c", color:"#fff", padding:"3px 8px", borderRadius:3 }}>
                         {anime.type || "TV"}
@@ -210,8 +225,7 @@ export default function AnimeGrid() {
             {/* ── Pagination ── */}
             {totalPages > 1 && (
               <div style={{ position:"relative", zIndex:10, display:"flex", alignItems:"center", justifyContent:"center", gap:6, marginTop:40, paddingTop:32, borderTop:"1px solid rgba(255,255,255,0.06)", flexWrap:"wrap" }}>
-                {/* Prev */}
-                <button className="ag-pg-btn" onClick={()=>goTo(page-1)} disabled={page===1}>
+                <button className="ag-pg-btn" onClick={() => goTo(page - 1)} disabled={page === 1}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="9,2 4,7 9,12"/></svg>
                 </button>
 
@@ -219,12 +233,11 @@ export default function AnimeGrid() {
                   {page} / {totalPages}
                 </span>
 
-                {/* Page numbers */}
                 {pageNums.map((n, i) =>
                   n === "..." ? (
                     <span key={`e${i}`} style={{ color:"rgba(255,255,255,0.2)", fontFamily:"'Bangers',cursive", fontSize:14, padding:"0 4px" }}>···</span>
                   ) : (
-                    <button key={n} className={`ag-pg-num${n === page ? " active" : ""}`} onClick={()=>goTo(n)}>{n}</button>
+                    <button key={n} className={`ag-pg-num${n === page ? " active" : ""}`} onClick={() => goTo(Number(n))}>{n}</button>
                   )
                 )}
 
@@ -232,8 +245,7 @@ export default function AnimeGrid() {
                   {all.length}{fetching ? "+" : ""} series
                 </span>
 
-                {/* Next */}
-                <button className="ag-pg-btn" onClick={()=>goTo(page+1)} disabled={page===totalPages}>
+                <button className="ag-pg-btn" onClick={() => goTo(page + 1)} disabled={page === totalPages}>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="5,2 10,7 5,12"/></svg>
                 </button>
               </div>
