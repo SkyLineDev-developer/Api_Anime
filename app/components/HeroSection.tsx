@@ -28,12 +28,14 @@ const STRIP_ITEMS = [
   { label: "Hunter x Hunter", hl: false },
 ];
 
-function useDebounce(value, delay) {
-  const [debounced, setDebounced] = useState(value);
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+
   useEffect(() => {
     const t = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(t);
   }, [value, delay]);
+
   return debounced;
 }
 
