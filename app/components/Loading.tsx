@@ -30,11 +30,12 @@ export default function Loading() {
   }, []);
 
   useEffect(() => {
-    let raf;
-    let start = null;
+    // ✅ FIX: tipos explícitos para evitar el error "implicitly has type 'any'"
+    let raf: number;
+    let start: number | null = null;
     const duration = 3000;
 
-    const animate = (timestamp) => {
+    const animate = (timestamp: number) => {
       if (!start) start = timestamp;
       const elapsed = timestamp - start;
       const t = Math.min(elapsed / duration, 1);
@@ -44,8 +45,9 @@ export default function Loading() {
           ? 85 + ((t - 0.6) / 0.2) * 7
           : 92 - ((t - 0.8) / 0.2) * 92;
       setProgress(Math.max(0, eased));
-      if (t < 1) raf = requestAnimationFrame(animate);
-      else {
+      if (t < 1) {
+        raf = requestAnimationFrame(animate);
+      } else {
         setProgress(0);
         start = null;
         raf = requestAnimationFrame(animate);
@@ -219,9 +221,9 @@ export default function Loading() {
 
       {/* Esquinas con texto japonés */}
       {[
-        { cls: "top-4 left-4 text-left",  text: "日本アニメ\nローディング" },
-        { cls: "top-4 right-4 text-right", text: "読み込み中\nアニメ" },
-        { cls: "bottom-4 left-4",          text: "©2025 ANIME STUDIO" },
+        { cls: "top-4 left-4 text-left",     text: "日本アニメ\nローディング" },
+        { cls: "top-4 right-4 text-right",   text: "読み込み中\nアニメ" },
+        { cls: "bottom-4 left-4",             text: "©2025 ANIME STUDIO" },
         { cls: "bottom-4 right-4 text-right", text: "エピソード01\n第一話" },
       ].map(({ cls, text }, i) => (
         <span
@@ -273,7 +275,8 @@ export default function Loading() {
 
         {/* Barra de progreso */}
         <div className="w-60 flex flex-col gap-1">
-          <div className="flex justify-between"
+          <div
+            className="flex justify-between"
             style={{
               fontFamily: "'Bangers', cursive",
               fontSize: 11,
@@ -299,10 +302,10 @@ export default function Loading() {
         {/* Tags japoneses */}
         <div className="flex gap-2 flex-wrap justify-center max-w-xs">
           {[
-            { label: "アニメ", red: true,    delay: "0s" },
-            { label: "桜",     red: false,   delay: "0.4s" },
-            { label: "侍",     red: true,    delay: "0.8s" },
-            { label: "日本",   red: false,   delay: "1.2s" },
+            { label: "アニメ", red: true,  delay: "0s" },
+            { label: "桜",     red: false, delay: "0.4s" },
+            { label: "侍",     red: true,  delay: "0.8s" },
+            { label: "日本",   red: false, delay: "1.2s" },
           ].map(({ label, red, delay }) => (
             <span
               key={label}
