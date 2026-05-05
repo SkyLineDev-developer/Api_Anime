@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const PER_PAGE  = 24;
 const MAX_PAGES = 6;
@@ -47,6 +48,7 @@ export default function AnimeGrid() {
   const [fetching, setFetching] = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const sectionRef              = useRef<HTMLElement>(null);
+  const router                  = useRouter();
 
   // ── Fetch páginas de Jikan ────────────────────────────────────────────────
   useEffect(() => {
@@ -179,7 +181,7 @@ export default function AnimeGrid() {
         {/* ── Grid ── */}
         {!loading && !error && (
           <>
-            <div style={{ position:"relative", zIndex:10, display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(155px, 1fr))", gap:14 }}>
+            <div style={{ position:"relative", zIndex:10, display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(min(155px, calc(50% - 7px)), 1fr))", gap:14 }}>
               {items.map((anime, i) => {
                 const img   = anime.images?.webp?.large_image_url ?? anime.images?.jpg?.large_image_url ?? "";
                 const score = anime.score ? `★ ${anime.score.toFixed(1)}` : null;
@@ -187,7 +189,12 @@ export default function AnimeGrid() {
                 const genre = anime.genres?.[0]?.name ?? null;
 
                 return (
-                  <div key={anime.mal_id} className="ag-card" style={{ animationDelay:`${(i * 0.03).toFixed(2)}s` }}>
+                  <div
+                    key={anime.mal_id}
+                    className="ag-card"
+                    style={{ animationDelay:`${(i * 0.03).toFixed(2)}s` }}
+                    onClick={() => router.push(`/pages/${anime.mal_id}`)}
+                  >
                     <div style={{ width:"100%", aspectRatio:"3/4", overflow:"hidden", position:"relative", background:"#1a1a2e" }}>
                       <img src={img} alt={anime.title} className="ag-cimg" loading="lazy"
                         onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }}/>
